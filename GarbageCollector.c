@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* The number of objects in our system. */
+// The number of objects in our system.
 #define STACK_MAX_SIZE 256
 
 /* The INITIAL_GC_THRESHOLD will be the number of objects at 
@@ -13,14 +13,14 @@
    Our language has two types, INT_TYPE and PAIR_TYPE.
    PAIR can contain more pairs or ints. */
 
-/* Objects type definitions. */
+// Objects type definitions.
 typedef enum {
   INT_TYPE,
   PAIR_TYPE
 } ObjectType;
 
 typedef struct sObject {
-  /* What type of object is this? */
+  // What type of object is this?
   ObjectType objectType;
 
   /* Marked for collection. 
@@ -39,10 +39,10 @@ typedef struct sObject {
      a single object for all three fields at the same time. A union does
      that. Groovy. */
   union {
-    /* INT_TYPE */
+    // INT_TYPE
     int value;
 
-    /* PAIR_TYPE */
+    // PAIR_TYPE
     struct {
       struct sObject* head;
       struct sObject* tail;
@@ -50,24 +50,25 @@ typedef struct sObject {
   };
 } Object;
 
-/* OUR MINIMAL VIRTUAL MACHINE (VM). */
-
-typedef struct {
-  /* The stack. */
+// Simple virtual machine.
+typedef struct VirtualMachine {
+  // The stack.
   Object* stack[STACK_MAX_SIZE];
 
-  /* The current size of the stack. */
+  // The current size of the stack.
   int stackSize;
-  /* The total number of currently allocated objects. */
+  
+  // The total number of currently allocated objects.
   int numObjects;
-  /* The number of objects required to trigger a GC. */
+  
+  // The number of objects required to trigger a GC.
   int maxObjects;
-  /* The first object in the list of all objects. */
-
+  
+  // The first object in the list of all objects.
   Object* firstObject;
 } VM;
 
-/* Function that creates and initializes a VM. */
+// Function that creates and initializes a VM.
 VM* newVM() {
   VM* vm = (VM*)malloc(sizeof(VM));
   vm->stackSize = 0;
@@ -79,53 +80,57 @@ VM* newVM() {
 
 /* VM MANIPULATION.
    We need to be able to manipulate our VM stack. */
-/* Function for adding an object from the stack. */
+// Function for adding an object from the stack.
 void push(VM* vm, Object* value) {
-  /* Message about error */
+  // Message about error
   if (vm->stackSize > STACK_MAX_SIZE) {
     perror("Stack overflow!\n");
     exit(EXIT_FAILURE);
   }
   
-  /* Increase the size of the stack when adding the object */
+  // Increase the size of the stack when adding the object */
   vm->stack[vm->stackSize++] = value;
 }
 
-/* Function for removing an object from the stack. */
+// Function for removing an object from the stack.
 Object* pop(VM* vm) {
   if (!(vm->stackSize > 0)) {
     perror("Stack underflow!\n");
     exit(EXIT_FAILURE);
   }
 
-  /* Reduce stack size when deleting an object. */
+  // Reduce stack size when deleting an object.
   return vm->stack[--(vm->stackSize)];
 }
 
-/* Method declaration, description below */
+// Method declaration, description below
 void gc(VM* vm);
 
-/*  We need to be able to actually create objects. */
+// We need to be able to actually create objects.
 Object* newObject(VM* vm, ObjectType objectType) {
   /* If the number of objects in the stack is equal to the max objects
      threshold, run the garbage collector. */
-  if (vm->numObjects == vm->maxObjects) gc(vm);
+  if (vm->numObjects == vm->maxObjects) {
+    gc(vm);
+  }
 
-  /* Allocate the new object. */
+  // Allocate the new object.
   Object* object = (Object*)malloc(sizeof(Object));
-  /* Set it's type. */
+  
+  // Set it's type.
   object->objectType = objectType;
-  /* Init marked to zero. */
+  
+  // Init marked to zero.
   object->marked = 0;
 
-  /* Insert it to the list of allocated objects. */
+  // Insert it to the list of allocated objects.
   object->next = vm->firstObject;
   vm->firstObject = object;
 
-  /* Increment the object count */
+  // Increment the object count.
   vm->numObjects++;
 
-  /* Return the object back to our caller. */
+  // Return the object back to our caller.
   return object;
 }
 
@@ -138,7 +143,7 @@ void pushInt(VM* vm, int intValue) {
   push(vm, object);
 }
 
-/* Push to stack PAIR_TYPE object. */
+// Push to stack PAIR_TYPE object.
 Object* pushPair(VM* vm) {
   Object* object = newObject(vm, PAIR_TYPE);
   object->tail = pop(vm);
@@ -162,10 +167,10 @@ void mark(Object* object) {
      This prevents loop and stack overflow. */
   if (object->marked) return;
 
-  /* Mark the object as reachable. */
+  // Mark the object as reachable.
   object->marked = 1;
 
-  /* If the object is a pair, its two fields are reachable too. */
+  // If the object is a pair, its two fields are reachable too.
   if (object->objectType == PAIR_TYPE) {
     mark(object->head);
     mark(object->tail);
@@ -194,15 +199,17 @@ void markAll(VM* vm) {
    And the VM will keep track of the head of that list. */
 
 void sweep(VM* vm) {
-  /* Pointer to a pointer to first object in VM's list. */
+  // Pointer to a pointer to first object in VM's list.
   Object** object = &vm->firstObject;
-  /* Iterate the list and check marking of elements. */
+  
+  // Iterate the list and check marking of elements.
   while (*object) {
-    /* This object wasn't reached, so remove it from the list and free it. */
+    
+    // This object wasn't reached, so remove it from the list and free it.
     if (!(*object)->marked) {
       Object* unreached = *object;
-
       *object = unreached->next;
+
       free(unreached);
     }
     /* This object was reached, so unmark it (for the next GC) 
@@ -214,13 +221,14 @@ void sweep(VM* vm) {
   }
 }
 
-/* GARBAGE COLLECTOR (GC). */
+// Run garbage collector.
 void gc(VM* vm) {
   int numObjects = vm->numObjects;
 
-  /* Mark all of the reachable objects. */
+  // Mark all of the reachable objects.
   markAll(vm);
-  /* Remove unreachable objects from the list and free it. */
+  
+  // Remove unreachable objects from the list and free it.
   sweep(vm);
 
   /* Change the threshold for the next collection to 2 times the new
@@ -228,11 +236,11 @@ void gc(VM* vm) {
   vm->maxObjects = vm->numObjects * 2;
 }
 
-/* TESTS. */
+// Garbage collector testing.
 int main() {
-  /* Create a new VM. */
+  // Create a new VM.
   VM* vm = newVM();
-  //vm->maxObjects = 4;
+  vm->maxObjects = 4;
 
   printf("Adding integer 0 to the stack.\n");
   pushInt(vm, 0);
@@ -249,20 +257,27 @@ int main() {
   printf("Adding a pair to the stack (consuming three ints and pair already there).\n");
   pushPair(vm);
 
-  printf("There are now %d objects in stack and %d objects have been allocated.\n", vm->stackSize, vm->numObjects);
+  printf(
+    "There are now %d objects in stack and %d objects have been allocated.\n",
+    vm->stackSize,
+    vm->numObjects);
 
-  /* Remove it from the stack, simulating the variable no longer being referenced. */
+  // Remove it from the stack, simulating the variable no longer being referenced.
   printf("Popping last pair from the stack.\n");
   Object* o = pop(vm);
 
-  printf("There are now %d objects in stack and %d objects have been allocated.\n", vm->stackSize, vm->numObjects);
+  printf("There are now %d objects in stack and %d objects have been allocated.\n",
+    vm->stackSize,
+    vm->numObjects);
 
   printf("Manual invoking GC (should free all)");
   gc(vm);
 
-  printf("There are now %d objects in stack and %d objects have been allocated.\n", vm->stackSize, vm->numObjects);
+  printf("There are now %d objects in stack and %d objects have been allocated.\n",
+    vm->stackSize,
+    vm->numObjects);
   
-  /* Done with the VM! */
+  // Done with the virtual machine.
   free(vm);
   return 0;
 }
