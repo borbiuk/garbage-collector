@@ -1,0 +1,10 @@
+# Compiled source #
+###################
+*.lib
+*.exe
+*.o
+*.bat
+
+# Visual Studio code #
+######################
+*.vscode/
